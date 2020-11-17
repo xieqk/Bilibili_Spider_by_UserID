@@ -1,6 +1,7 @@
 import re
 import os
 import os.path as osp
+import sys
 import json
 import time
 import argparse
@@ -14,13 +15,15 @@ from .tools import mkdir_if_missing, write_json
 
 class Bilibili_Spider():
 
-    def __init__(self, uid, save_dir_json):
+    def __init__(self, uid, save_dir_json='json', save_by_page=False):
         self.uid = uid
         self.user_url = 'https://space.bilibili.com/{}'.format(uid)
         self.save_dir_json = save_dir_json
+        self.save_by_page = save_by_page
         options = webdriver.FirefoxOptions()
         options.add_argument('--headless')
         self.browser = webdriver.Firefox(options=options)
+        print('spider init done.')
 
     def close(self):
         # 关闭浏览器驱动
@@ -46,7 +49,7 @@ class Bilibili_Spider():
         page_url = self.user_url + '/video?tid=0&page={}&keyword=&order=pubdate'.format(1)
         self.browser.get(page_url)
         time.sleep(2)
-        html = BeautifulSoup(self.browser.page_source)
+        html = BeautifulSoup(self.browser.page_source, features="html.parser")
 
         page_number = html.find('span', attrs={'class':'be-pager-total'}).text
         user_name = html.find('span', id = 'h-name').text
@@ -55,11 +58,11 @@ class Bilibili_Spider():
 
     def get_videos_by_page(self, idx):
         # 获取第 page_idx 页的视频信息
-        urls_page, titles_page, plays_page, dates_page, durations_page = [], [], [], []
+        urls_page, titles_page, plays_page, dates_page, durations_page = [], [], [], [], []
         page_url = self.user_url + '/video?tid=0&page={}&keyword=&order=pubdate'.format(idx+1)
         self.browser.get(page_url)
         time.sleep(2)
-        html = BeautifulSoup(self.browser.page_source)
+        html = BeautifulSoup(self.browser.page_source, features="html.parser")
 
         ul_data = html.find('div', id = 'submit-video-list').find('ul', attrs= {'class': 'clearfix cube-list'})
 
@@ -85,8 +88,29 @@ class Bilibili_Spider():
 
         return urls_page, titles_page, plays_page, dates_page, durations_page
 
+    def save(self, json_path, bvs, urls, titles, plays, durations, dates):
+        data_list = []
+        for i in range(len(urls)):
+            result = {}
+            result['user_name'] = self.user_name
+            result['bv'] = bvs[i]
+            result['url'] = urls[i]
+            result['title'] = titles[i]
+            result['play'] = plays[i]
+            result['duration'] = durations[i]
+            result['pub_date'] = dates[i][0]
+            result['now'] = dates[i][1]
+            data_list.append(result)
+        
+        print('write json to {}'.format(json_path))
+        dir_name = osp.dirname(json_path)
+        mkdir_if_missing(dir_name)
+        write_json(data_list, json_path)
+        print('dump json file done. total {} urls. \n'.format(len(urls)))
+
     def get(self):
         # 获取该 up 主的所有基础视频信息
+        print('Start ... \n')
         self.page_num, self.user_name = self.get_page_num()
 
         bvs = []
@@ -108,32 +132,20 @@ class Bilibili_Spider():
             assert len(urls_page) == len(dates_page), '{} != {}'.format(len(urls_page), len(dates_page))  
             assert len(urls_page) == len(durations_page), '{} != {}'.format(len(urls_page), len(durations_page))  
             print('result:')
-            print(zip(bvs_page, titles_page, dates_page[0], durations_page, plays_page))
+            print('{}_{}: ['.format(self.user_name, self.uid), list(zip(bvs_page, titles_page, dates_page, durations_page, plays_page))[0], ', ... ], {} in total'.format(len(urls_page)))
+            sys.stdout.flush()
             bvs.extend(bvs_page)
             urls.extend(urls_page)
             titles.extend(titles_page)
             plays.extend(plays_page)
             dates.extend(dates_page)
             durations.extend(durations_page)
+            if self.save_by_page:
+                json_path_page = osp.join(self.save_dir_json, '{}_{}'.format(self.user_name, self.uid), 'page_{}.json'.format(idx+1))
+                self.save(json_path_page, bvs_page, urls_page, titles_page, plays_page, durations_page, dates_page)
 
-        data_list = []
-        for i in range(len(urls_page)):
-            result = {}
-            result['user_name'] = self.user_name
-            result['bv'] = bvs[i]
-            result['url'] = urls[i]
-            result['title'] = titles[i]
-            result['play'] = plays[i]
-            result['duration'] = durations[i]
-            result['pub_date'] = dates[i][0]
-            result['now'] = dates[i][1]
-            data_list.append(result)
-        
-        json_path = osp.join(self.save_dir_json, '{}_{}.json'.format(self.user_name, self.uid))
-        print('write json to {}'.format(json_path))
-        mkdir_if_missing(self.save_dir_json)
-        write_json(data_list, json_path)
-        print('dump json file done. total {} urls'.format(len(urls)))
+        json_path = osp.join(self.save_dir_json, '{}_{}'.format(self.user_name, self.uid), 'full.json')
+        self.save(json_path, bvs, urls, titles, plays, durations, dates)
 
 
 
