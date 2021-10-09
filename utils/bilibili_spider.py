@@ -163,6 +163,7 @@ class Bilibili_Spider():
         html = BeautifulSoup(self.browser.page_source, features="html.parser")
 
         video_data = html.find('div', id = 'viewbox_report').find_all('span')
+        # print(video_data)
         play = int(video_data[1]['title'][4:])
         danmu = int(video_data[2]['title'][7:])
         date = video_data[3].text
@@ -171,7 +172,8 @@ class Bilibili_Spider():
         if multi_page is not None:
             url_type = 'playlist'
             pages = multi_page.find('span', attrs= {'class': 'cur-page'}).text
-            page_total = int(pages.split('/')[-1])
+            # print(pages)
+            page_total = int(pages[1:-1].split('/')[-1])
         else:
             url_type = 'video'
             page_total = 1
