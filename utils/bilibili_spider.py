@@ -33,8 +33,13 @@ class Bilibili_Spider():
 
     def time_convert(self, time_str):
         time_item = time_str.split(':')
-        assert len(time_item) == 2, 'time format error: {}, x:x expected!'.format(time_str)
-        seconds = int(time_item[0])*60 + int(time_item[1])
+        assert 1 <= len(time_item) <= 3, 'time format error: {}, x:x expected!'.format(time_str)
+        if len(time_item) == 1:
+            seconds = int(time_item[1])
+        elif len(time_item) == 2:
+            seconds = int(time_item[0])*60 + int(time_item[1])
+        else:
+            seconds = int(time_item[0])*60*60 + int(time_item[1])*60 + int(time_item[2])
         return seconds
 
     def date_convert(self, date_str):
@@ -77,16 +82,15 @@ class Bilibili_Spider():
             date_str = li.find('span', attrs = {'class':'time'}).text.strip()
             pub_date = self.date_convert(date_str)
             now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            play = int(li.find('span', attrs = {'class':'play'}).text.strip())
-            # duration
+            play = li.find('span', attrs = {'class':'play'}).text.strip()
             time_str = li.find('span', attrs = {'class':'length'}).text
-            duration = self.time_convert(time_str)
+            # duration = self.time_convert(time_str)
             # append
             urls_page.append(a_url)
             titles_page.append(a_title)
             dates_page.append((pub_date, now))
             plays_page.append(play)
-            durations_page.append(duration)
+            durations_page.append(time_str)
 
         return urls_page, titles_page, plays_page, dates_page, durations_page
 
