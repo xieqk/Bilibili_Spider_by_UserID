@@ -7,6 +7,8 @@ import time
 import argparse
 import datetime
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 from urllib import parse as url_parse
 import random
@@ -22,9 +24,12 @@ class Bilibili_Spider():
         self.user_url = 'https://space.bilibili.com/{}'.format(uid)
         self.save_dir_json = save_dir_json
         self.save_by_page = save_by_page
-        options = webdriver.FirefoxOptions()
-        options.add_argument('--headless')
-        self.browser = webdriver.Firefox(options=options)
+        
+        # 设置chrome选项
+        chrome_options = Options()
+        # 无头浏览器运行会找不到元素，不过这可能是我的问题
+        # chrome_options.add_argument('--headless')
+        self.browser = webdriver.Chrome(options=chrome_options)
         print('spider init done.')
 
     def close(self):
@@ -57,11 +62,14 @@ class Bilibili_Spider():
         self.browser.get(page_url)
         time.sleep(self.t+2*random.random())
         html = BeautifulSoup(self.browser.page_source, features="html.parser")
-
-        page_number = html.find('span', attrs={'class':'be-pager-total'}).text
+        # print(html)
+        # 提取页数
+        last_page_number_text = html.find('span', class_='be-pager-total').text
+        last_page_number = int(last_page_number_text.split(' ')[1])
+        
         user_name = html.find('span', id = 'h-name').text
 
-        return int(page_number.split(' ')[1]), user_name
+        return last_page_number, user_name
 
     def get_videos_by_page(self, idx):
         # 获取第 page_idx 页的视频信息
@@ -136,7 +144,7 @@ class Bilibili_Spider():
             while len(urls_page) == 0:
                 print('failed, try again page {}/{}'.format(idx+1, self.page_num))
                 urls_page, titles_page, plays_page, dates_page, durations_page = self.get_videos_by_page(idx)
-            bvs_page = [x.split('/')[-1] for x in urls_page]
+            bvs_page = [x.split('/')[-2] for x in urls_page] # 裁剪得到bv号，现在的url之后以`/`结尾，[-1]提取到的bv为空
             assert len(urls_page) == len(titles_page), '{} != {}'.format(len(urls_page), len(titles_page)) 
             assert len(urls_page) == len(plays_page), '{} != {}'.format(len(urls_page), len(titles_page)) 
             assert len(urls_page) == len(dates_page), '{} != {}'.format(len(urls_page), len(dates_page))  
