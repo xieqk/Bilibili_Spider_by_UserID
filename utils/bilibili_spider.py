@@ -43,6 +43,9 @@ class Bilibili_Spider():
         return seconds
 
     def date_convert(self, date_str):
+        if "小时前" in date_str:
+            now = datetime.datetime.now()
+            date_str = str(now.date().month) + "-" + str(now.date().day)
         date_item = date_str.split('-')
         assert len(date_item) == 2 or len(date_item) == 3, 'date format error: {}, x-x or x-x-x expected!'.format(date_str)
         if len(date_item) == 2:
